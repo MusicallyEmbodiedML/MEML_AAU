@@ -15,30 +15,32 @@
 #include <SD.h>
 #include <SerialFlash.h>
 
-
-
 // GUItool: begin automatically generated code
+AudioInputI2S            i2s2;           //xy=335.8833312988281,447.8833312988281
 AudioSynthWaveform       waveform1;      //xy=401,161
 AudioSynthWaveform       waveform2;      //xy=409,214
 AudioSynthWaveform       waveform3; //xy=417,279
+AudioAnalyzeFFT256       fft256_1;       //xy=568.8833312988281,445.8833312988281
 AudioMixer4              mixer1;         //xy=704,199
-AudioOutputI2S           i2s1;           //xy=1006,212
-AudioConnection          patchCord1(waveform1, 0, mixer1, 0);
-AudioConnection          patchCord2(waveform2, 0, mixer1, 1);
-AudioConnection          patchCord3(waveform3, 0, mixer1, 2);
-AudioConnection          patchCord4(mixer1, 0, i2s1, 0);
-AudioConnection          patchCord5(mixer1, 0, i2s1, 1);
-AudioControlSGTL5000     sgtl5000_1;     //xy=647,531
+AudioOutputI2S           i2s1;           //xy=958,155
+AudioConnection          patchCord1(i2s2, 0, fft256_1, 0);
+AudioConnection          patchCord2(waveform1, 0, mixer1, 0);
+AudioConnection          patchCord3(waveform2, 0, mixer1, 1);
+AudioConnection          patchCord4(waveform3, 0, mixer1, 2);
+AudioConnection          patchCord5(mixer1, 0, i2s1, 0);
+AudioConnection          patchCord6(mixer1, 0, i2s1, 1);
+AudioControlSGTL5000     sgtl5000_1;     //xy=590,634
 // GUItool: end automatically generated code
+
 
 const int sliderPin= 14;
 
-const size_t nInputs=1;
-const size_t nOutputs=1;
-const size_t patternElements=20;
+const size_t nInputs=64;
+const size_t nOutputs=3;
+const size_t patternElements=1;
 const size_t patternSize = patternElements * nInputs;
 
-const unsigned int layers[] = {patternSize, 10, 10, nOutputs}; // 3 layers (1st)layer with 3 input neurons (2nd)layer 5 hidden neurons each and (3rd)layer with 1 output neuron
+const unsigned int layers[] = {patternSize, 64, 32, nOutputs}; // 3 layers (1st)layer with 3 input neurons (2nd)layer 5 hidden neurons each and (3rd)layer with 1 output neuron
 float *output; 
 
 
@@ -52,7 +54,7 @@ enum NNMODES {TRAINING, INFERENCE};
 NNMODES nnMode = NNMODES::TRAINING;
 
 
-std::vector<std::vector<float>> expectedOutput {{0}, {0.5}, {1}}; 
+std::vector<std::vector<float>> expectedOutput {{1,0,0}, {0,1,0}, {0,0,1}}; 
 
 
 NeuralNetwork NN(layers, NumberOf(layers)); // Creating a Neural-Network with default learning-rates
@@ -74,16 +76,6 @@ void addTrainingPoint(std::vector<float> x, size_t y) { //training inputs, and i
   }
 }
 
-void undoLastTraining() {
-  if (trainingInputs.size() > 0) {
-    trainingInputs.pop_back();
-    trainingOutputs.pop_back();
-    Serial.println("Removed most recent training point");
-  }else{
-    Serial.println("There are no training points to remove");
-  }
-}
-
 void train() {
   size_t maxEpochs = 500;
   do{ 
@@ -97,7 +89,7 @@ void train() {
     Serial.print("MSE: "); 
     Serial.println(NN.MeanSqrdError,6);
 
-  }while(NN.getMeanSqrdError(trainingInputs.size()) > 0.01 && maxEpochs-- > 0);
+  }while(NN.getMeanSqrdError(trainingInputs.size()) > 0.0001 && maxEpochs-- > 0);
 }
 
 void resetTraining() {
@@ -132,18 +124,12 @@ void printTrainingData() {
 void setup()
 {
   pinMode(sliderPin, INPUT);
-
-  if (!SD.begin() ) {
-    Serial.println("Could not start SD card");
-  }
   AudioMemory(200);
 
-  // Comment these out if not using the audio adaptor board.
-  // This may wait forever if the SDA & SCL pins lack
-  // pullup resistors
   sgtl5000_1.enable();
   sgtl5000_1.volume(0.9);
-  // sgtl5000_1.inputSelect(AUDIO_INPUT_MIC);
+  sgtl5000_1.inputSelect(AUDIO_INPUT_MIC);
+  sgtl5000_1.micGain(50);
   
   waveform1.begin(WAVEFORM_SAWTOOTH);
   waveform1.frequency(200);
@@ -155,6 +141,8 @@ void setup()
   waveform3.frequency(210);
   waveform3.amplitude(0.3);
 
+  // fft256_1.averageTogether(1);
+
   Serial.begin(115200);
   Serial.setTimeout(1);
 }
@@ -163,11 +151,16 @@ int count=0;
 std::vector<float> p(patternSize);
 
 void loop() {
-  int sliderValue = analogRead(sliderPin);
-  float sliderNorm = sliderValue / 1023.0;
+  // int sliderValue = analogRead(sliderPin);
+  // float sliderNorm = sliderValue / 1023.0;
   //push all inputs into the pattern buffer
-  patternBuffer.push(sliderNorm);
-  patternBuffer.copyToArray(p.data());
+  // patternBuffer.push(sliderNorm);
+  if (fft256_1.available()) {
+    for(size_t bin=0; bin < 64; bin++) {
+      patternBuffer.push(fft256_1.read(bin));
+    }
+    patternBuffer.copyToArray(p.data());
+  }
 
   if (Serial.available()) {
     String command = Serial.readString();
@@ -195,22 +188,6 @@ void loop() {
       else if (command == "m") { //reset model
         resetModel();
       }    
-      else if (command == "u") { //undo last data point
-        undoLastTraining();        
-      }    
-      else if (command == "c") { //save to SD
-        SD.remove("neural.net");
-        bool res = NN.save("neural.net");
-        Serial.print("Network saved: ");
-        Serial.println(res);
-        NN.print();
-      }    
-      else if (command == "l") { //load from SD
-        bool res = NN.load("neural.net");
-        Serial.print("Network loaded: ");
-        Serial.println(res);
-        NN.print();
-      }    
       else if (isDigit(command[0])) {
         addTrainingPoint(p, command.toInt());
       }    
@@ -227,6 +204,5 @@ void loop() {
     }
     Serial.println("");
   }
-  delay(20);
 
 }
