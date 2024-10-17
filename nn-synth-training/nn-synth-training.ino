@@ -27,7 +27,7 @@ AudioConnection          patchCord5(mixer1, 0, i2s1, 1);
 AudioControlSGTL5000     sgtl5000_1;     //xy=647,531
 // GUItool: end automatically generated code
 
-const int sliderPin= A13;
+const int sliderPin= 14;
 
 const size_t nInputs=1;
 const size_t nOutputs=3;
@@ -36,12 +36,13 @@ const unsigned int layers[] = {nInputs, 5, nOutputs}; // 3 layers (1st)layer wit
 float *output; // 3rd layer's output(s)
 
 //Default Inputs/Training-Data
-const float inputs[2][nInputs] = {
+const float inputs[3][nInputs] = {
   {0}, // = 0
   {1}, // = 1
+  {0.3}
 };
 
-const float expectedOutput[2][nOutputs] = {{0.5,0.0,0.5}, {0.0,0.7,0.9}}; // values that we are expecting to get from the 3rd/(output)layer of Neural-Network, in other words something like a feedback to the Neural-network.
+const float expectedOutput[3][nOutputs] = {{0.5,0.0,0.5}, {0.0,0.7,0.9}, {0.3,0.1,1.0}}; // values that we are expecting to get from the 3rd/(output)layer of Neural-Network, in other words something like a feedback to the Neural-network.
 NeuralNetwork NN(layers, NumberOf(layers)); // Creating a Neural-Network with default learning-rates
 
 void setup()
@@ -112,14 +113,14 @@ void loop() {
   Serial.println(liveInput[0]);
   output = NN.FeedForward(liveInput);
 
-  waveform1.frequency(map(output[0], 0, 1, 200, 500));
-  waveform2.frequency(map(output[1], 0, 1, 200, 500));
-  waveform3.frequency(map(output[2], 0, 1, 200, 500));
+  waveform1.frequency(map(output[0], 0, 1, 100, 500));
+  waveform2.frequency(map(output[1], 0, 1, 100, 500));
+  waveform3.frequency(map(output[2], 0, 1, 100, 500));
   for(size_t j=0; j < nOutputs; j++) {
     Serial.print(output[j], 7);       // Prints the first 7 digits after the comma.
     Serial.print("\t");
   }
   Serial.println("");
-  delay(100);
+  delay(10);
 
 }
