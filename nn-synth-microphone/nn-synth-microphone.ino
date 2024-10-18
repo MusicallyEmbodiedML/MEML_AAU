@@ -3,7 +3,8 @@
 #define NumberOf(arg) ((unsigned int) (sizeof (arg) / sizeof (arg [0]))) // calculates the number of layers (in this case 3)
 #define _2_OPTIMIZE 0B00000000 // Enable 0B01.. for NO_BIAS or 0B001.. for MULTIPLE_BIASES_PER_LAYER
 #define _1_OPTIMIZE 0B00010000 // https://github.com/GiorgosXou/NeuralNetworks#define-macro-properties
-#define Tanh                   // Comment this line to use Sigmoid (the default) activation function
+// #define Tanh                   // Comment this line to use Sigmoid (the default) activation function
+#define CATEGORICAL_CROSS_ENTROPY
 
 #include <NeuralNetwork.h>
 #include <vector>
@@ -87,9 +88,12 @@ void train() {
     
     // Prints the Error.
     Serial.print("MSE: "); 
-    Serial.println(NN.MeanSqrdError,6);
+    // Serial.println(NN.MeanSqrdError,6);
+    Serial.println(NN.CategoricalCrossEntropy,6);
 
-  }while(NN.getMeanSqrdError(trainingInputs.size()) > 0.0001 && maxEpochs-- > 0);
+  // }while(NN.getMeanSqrdError(trainingInputs.size()) > 0.0001 && maxEpochs-- > 0);
+  }while(NN.getCategoricalCrossEntropy(trainingInputs.size()) > 0.0001 && maxEpochs-- > 0);
+  
 }
 
 void resetTraining() {
